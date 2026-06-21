@@ -23,7 +23,7 @@ def api_call(cet_str, out_path):
 
 def fetch_cet(month, cet_type):
     """
-    Docstring for fetch_cet
+    Fetching CET data from Met Office
     
     month: what month we are getting CET for
     cet_type: what kind of CET are we processing

@@ -8,7 +8,7 @@ import smplotlib
 
 def cet_all(month, models, cet_type, plot=False):
     """
-    Docstring for cet_all
+    Final proccessing and plotting function
     
     month: month we are computing CET for
     models: which models we are computing fcst CET for

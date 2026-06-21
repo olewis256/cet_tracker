@@ -17,7 +17,7 @@ url = "https://api.open-meteo.com/v1/forecast"
 
 def compute_cet(model, cet_type, cet_in_flag):
     """
-    Docstring for compute_cet
+    Computing the CET from NWP fcst data
     
     model: NWP model to use
     cet_type: what type of CET are we computing

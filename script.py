@@ -1,89 +1,112 @@
-from fetch_cet import fetch_cet
-from compute_cet import compute_cet
+from fetch_cet import cetDATA
+from compute_cet import ComputeCET
 from get_fcst_runtime import get_fcst_time
 import numpy as np
 from months import days_in_month
 import matplotlib.pyplot as plt
 import smplotlib
 
+class ProcessCET():
 
-def cet_all(month, models, cet_type, plot=False, use_prev=0, full_run=False):
-    """
-    Final proccessing and plotting function
-    
-    month: month we are computing CET for
-    models: which models we are computing fcst CET for
-    cet_type: type of CET we are computing
-    plot: do we want to plot the data
-    """
+    def __init__(self, month, models, cet_type, plot=False, use_prev=0, full_run=False):
 
-    # TO DO: Having too many models on one plot is messy, so just limiting to one subset e.g. EC models
-    if len(models.keys()) > 1:
-        ValueError("Please use one model")
+        self.month = month
+        self.models = models
+        self.cet_type = cet_type
+        self.use_prev = use_prev
+        self.full_run = full_run
 
-    if plot:
-        fig, ax = plt.subplots(figsize=(12, 8))
+        self.plot = plot
+        if self.plot:
+            self.fig, self.ax = plt.subplots(figsize=(12, 8))
 
-    # group would be EC, and model_array is the subset of models available from EC
-    for group, model_array in models.items():
+
+    def fetch_cet_data(self):
+
+        cet_data = cetDATA()
+
+        cet_data.fetch_data(self.month, self.cet_type)
+
+        self.cet_in_flag = cet_data.cet_in_flag
+        self.cet_vals = cet_data.cet_vals
+        self.cet_days = cet_data.cet_days
+
+    def nwp_cet_data(self):
+
+        self.fetch_cet_data()
+
+        self.nwp_cet = ComputeCET(self.cet_type, self.cet_in_flag, 
+                                        self.use_prev, self.full_run)
+
+        for group, model_array in self.models.items():
         
-        for model in model_array:
+            for model in model_array:
 
-            runtime=get_fcst_time(model)
-
-            # fetching this month's CET, and whether we have yesterday's data
-            acc_cet = fetch_cet(month, cet_type)
-            cet_in_flag = acc_cet[2]
-
-            # fetchig and computing fcst CET, to month end (if available)
-            fcst_cet = compute_cet(model, cet_type, cet_in_flag, runtime, use_prev, full_run)
-            used_time = fcst_cet[2]
-            print(f"Fetched CET for month {month}. {acc_cet[0]} for {acc_cet[1]} days.")
-            print(f"Computed mean CET: {fcst_cet[0]}")
-
-            # How many days in total do we (may not be number of days in the month)
-            total_days = acc_cet[1] + (fcst_cet[1] - acc_cet[1]) + fcst_cet[3]
-            print(f"Total days of data: {total_days}")
-            assert total_days <= days_in_month[month]['days'], (
-                f"total_days={total_days} exceeds days in month "
-                f"({days_in_month[month]['days']})"
-            )
-
-            acc_cet_vals = acc_cet[0]
-
-            if use_prev and cet_in_flag:
-                fcst_cet_vals = fcst_cet[0][use_prev:]
-                fcst_start = len(acc_cet[0]) + 1 - use_prev
-            else:
-                fcst_cet_vals = fcst_cet[0]
-                fcst_start = len(acc_cet[0])+1
-
-            # final CET computation, using current CET and fcst CET
-            cet_vals = np.sum(acc_cet_vals) + np.sum(fcst_cet_vals)
-            cet_vals = cet_vals / total_days
-
-            print(f"Computed total CET {model}: {cet_vals}.")
-
-            # constructing date arrays for plot
-            dates_cet = np.linspace(1, len(acc_cet[0]), len(acc_cet[0]), endpoint=True)
-            dates_fcst = np.linspace(fcst_start, fcst_start + len(fcst_cet[0]), len(fcst_cet[0]), endpoint=True)
+                self.fetch_cet_data()
+                runtime=get_fcst_time(model)
                 
-            if plot:
+                self.nwp_cet.fetch_data(model, runtime)
+                
+                print(f"Fetched CET for month {self.month}. {self.cet_vals} for {self.cet_days} days.")
+                print(f"Computed mean CET: {self.nwp_cet.cet}")
+
+                
+                model_runtime = self.nwp_cet.runtime
+
+                # How many days in total do we (may not be number of days in the month)
+                tot_days = self.cet_days + (self.nwp_cet.days_fcst - self.cet_days) + self.nwp_cet.day_of_start
+                if tot_days < self.cet_days:
+                    tot_days = self.cet_days
+                
+                days_ahead_of_cet = self.nwp_cet.days_fcst + self.nwp_cet.day_of_start - self.cet_days
+                print(f"Total days of data: {tot_days}")
+                print(f"Forecast days ahead of CET date: {days_ahead_of_cet}")
+            
+                assert tot_days <= days_in_month[self.month]['days'], (
+                    f"total_days={tot_days} exceeds days in month "
+                    f"({days_in_month[self.month]['days']})"
+                )
+
+                nwp_cet_filter = self.nwp_cet.cet
+
+                if self.use_prev and self.cet_in_flag:
+                    if days_ahead_of_cet > 0:
+                        nwp_cet_filter = self.nwp_cet.cet[self.use_prev:]
+                        self.fcst_start = self.cet_days + 1 - self.use_prev
+                    else:
+                        nwp_cet_filter = 0
+                        self.fcst_start = self.cet_days + 1 - self.use_prev
+                else:
+                    nwp_cet_filter = self.nwp_cet.cet
+                    self.fcst_start = self.cet_days+1
+
+                # final CET computation, using current CET and fcst CET
+                cet_vals = np.sum(self.cet_vals) + np.sum(nwp_cet_filter)
+                cet_vals = cet_vals / tot_days
+
+                print(f"Computed total CET {model}: {cet_vals}.")
+
+                
+                if self.plot:
+
+                    dates_cet = np.linspace(1, self.cet_days, self.cet_days, endpoint=True)
+                    dates_fcst = np.linspace(self.fcst_start, self.fcst_start + self.nwp_cet.days_fcst, self.nwp_cet.days_fcst, endpoint=True)
+
+
+                    self.ax.plot(dates_fcst, self.nwp_cet.cet, label=f"{model}, cet: {cet_vals:.1f} C to {tot_days} ({model_runtime})")
+                    self.ax.plot(dates_cet, self.cet_vals, color='black', linestyle='--')
+
+        self.ax.set_title(f"June 2026 {self.cet_type} daily CET")
+        self.ax.set_ylabel(f"Daily {self.cet_type} CET (C)")
+        save_str = f'plots/test_{group}_{self.cet_type}.png'
+
+        self.ax.set_xlabel("Day")
+        self.ax.set_xlim(1, days_in_month[self.month]['days'])
+        self.ax.set_xticks([1, 5, 10, 15, 20, 25, days_in_month[self.month]['days']])
+        self.ax.grid(True, which="major", linestyle="--", linewidth=0.7, alpha=0.8)
+        self.ax.legend()
+        plt.savefig(save_str)
         
-                ax.plot(dates_fcst, fcst_cet[0], label=f"{model}, cet: {cet_vals:.1f} C to {total_days} ({used_time})")
-                ax.plot(dates_cet, acc_cet[0], color='black', linestyle='--')
-
-
-    ax.set_title(f"June 2026 {cet_type} daily CET")
-    ax.set_ylabel(f"Daily {cet_type} CET (C)")
-    save_str = f'plots/test_{group}_{cet_type}.png'
-
-    ax.set_xlabel("Day")
-    ax.set_xlim(1, days_in_month[month]['days'])
-    ax.set_xticks([1, 5, 10, 15, 20, 25, days_in_month[month]['days']])
-    ax.grid(True, which="major", linestyle="--", linewidth=0.7, alpha=0.8)
-    ax.legend()
-    plt.savefig(save_str)
 
 if __name__=="__main__":
 
@@ -97,8 +120,8 @@ if __name__=="__main__":
 
     # MODELS = ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]
 
-    cet_all(MONTH, MODELS, CET_TYPE, plot=True, full_run=True)
-
+    process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, plot=True, use_prev=0, full_run=True)
+    process_cet.nwp_cet_data()
     """
     TO DO: I would like to compute next month fcst CET too, but will need to separable out. Perhaps flag for either this month/next month
     where data allows?

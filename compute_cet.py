@@ -1,5 +1,4 @@
 import numpy as np
-from openmeteo_sdk.Variable import Variable
 import openmeteo_requests
 import matplotlib.pyplot as plt
 from datetime import date, timedelta, datetime, timezone
@@ -15,94 +14,109 @@ sites = {
 openmeteo = openmeteo_requests.Client()
 url = "https://single-runs-api.open-meteo.com/v1/forecast"
 
-def compute_cet(model, cet_type, cet_in_flag, runtime, use_prev, full_run):
-    """
-    Computing the CET from NWP fcst data
-    
-    model: NWP model to use
-    cet_type: what type of CET are we computing
-    cet_in_flag: flag to check if yesterday's CET data has arrived
-    """ 
+class ComputeCET():
 
-    # if yesertday's CET is in, use today's date
-    if cet_in_flag:
-        start_date = date.today()
-        # 06 and 18z runs aren't full runs, so use previous 00z or 12z runs
-        if full_run:
-            if runtime.endswith(("06:00")):
-                print(f"Changing run {runtime} to 00:00")
+    def __init__(self, cet_type, cet_in_flag, use_prev, full_run):
+
+        self.cet_type = cet_type
+        self.cet_in_flag = cet_in_flag
+        self.use_prev = use_prev
+        self.full_run = full_run
+
+    def compute_dates(self, runtime):
+
+        if self.cet_in_flag and self.use_prev == 0:
+            start_date = date.today()
+            # Here, using full run means using the 00z run for today (since the 06z minimum is yet to occur)
+            # If we use, later runs, the CET becomes biased. Also using today's 00z run, since yesterday's
+            # CET data has arrived. 
+
+            start_date = date.today()
+            if runtime.endswith(("00:00")):
+                pass
+            else:
+                print(f"Changing run {runtime} to 00:00 today, for consistency (06z has already passed)")
                 runtime = datetime.strptime(runtime, "%Y-%m-%dT%H:%M").replace(hour=0, minute=0, 
                                                                         tzinfo=timezone.utc)
                 runtime = runtime.strftime("%Y-%m-%dT%H:%M")
-            elif runtime.endswith(("18:00")):
-                print(f"Changing run {runtime} to 12:00")
-                runtime = datetime.strptime(runtime, "%Y-%m-%dT%H:%M").replace(hour=12, minute=0, 
-                                                                        tzinfo=timezone.utc)
-                runtime = runtime.strftime("%Y-%m-%dT%H:%M")
 
-    else:
-        # if yesterday's CET isn't in yet, use yesterday's forecast
-        start_date = date.today() - timedelta(days=1)
-        runtime = datetime.strptime(runtime, "%Y-%m-%dT%H:%M").replace(hour=12, minute=0, 
-                                                                       tzinfo=timezone.utc) - timedelta(days=1)
-        runtime = runtime.strftime("%Y-%m-%dT%H:%M")
-        print(f"CET not populated, using start date {runtime}")
 
-    if use_prev:
-        # use previous days 12z model runs
-        start_date = date.today() - timedelta(days=use_prev)
-        runtime = datetime.strptime(runtime, "%Y-%m-%dT%H:%M").replace(hour=12, minute=0,
-                                                                       tzinfo=timezone.utc) - timedelta(days=use_prev)
-        runtime = runtime.strftime("%Y-%m-%dT%H:%M")
+        if self.cet_in_flag is False:
+            # If yesterday's CET isn't in yet, we want to use yesterday's forecast to fill the gap
 
-    last_day = calendar.monthrange(start_date.year, start_date.month)[1]
-    end_date = date(start_date.year, start_date.month, last_day)
+            start_date = date.today() - timedelta(days=1)
+            runtime = datetime.strptime(runtime, "%Y-%m-%dT%H:%M").replace(hour=12, minute=0, 
+                                                                        tzinfo=timezone.utc) - timedelta(days=1)
+            runtime = runtime.strftime("%Y-%m-%dT%H:%M")
+            print(f"CET not populated, using start date {runtime}")
 
-    # determinging how many days there are until the end of the month,
-    # then creating empty arrays to hold data
-    num_days_to_endmonth = (end_date - start_date).days + 1
-    cet_daily = np.empty((num_days_to_endmonth, 3))
-    cet = np.empty(num_days_to_endmonth)
+        if self.use_prev:
+            # If using previous model runs to today
 
-    for i, site in enumerate(sites):
-        
-        print(f"Fetching data for site: {site} from {start_date} to {end_date} ({num_days_to_endmonth})")
+            start_date = date.today() - timedelta(days=self.use_prev)
+            runtime = datetime.strptime(runtime, "%Y-%m-%dT%H:%M").replace(hour=12, minute=0,
+                                                                        tzinfo=timezone.utc) - timedelta(days=self.use_prev)
+            runtime = runtime.strftime("%Y-%m-%dT%H:%M")
 
-        # API call to open-meteo to fetch NWP data
+        self.start_date = start_date
+        self.runtime = runtime
 
-        params = {
-            "latitude": sites[site]["latitude"],
-            "longitude": sites[site]["longitude"],
-            "daily": ["temperature_2m_max", "temperature_2m_min"],
-            "models": model,
-            "forecast_days": num_days_to_endmonth,
-            "run": runtime
-        }
-        
-        responses = openmeteo.weather_api(url, params=params)
-        response = responses[0]
+        # get last day of month and the full date
+        self.last_day = calendar.monthrange(start_date.year, start_date.month)[1]
+        self.end_date = date(start_date.year, start_date.month, self.last_day)
 
-        max_temperature_2m = response.Daily().Variables(0).ValuesAsNumpy()
-        min_temperature_2m = response.Daily().Variables(1).ValuesAsNumpy()
+        # how many days until the end of the month
+        self.num_days_to_endmonth = (self.end_date - self.start_date).days + 1
 
-        # checking how many days we actually got NWP data for (not all models
-        # have same leadtime). If not reaching end of month, adjust to fcst_days
-        days_fcst = len(max_temperature_2m[~np.isnan(max_temperature_2m)])
-        if days_fcst < num_days_to_endmonth:
-            print(f"WARNING: Can't reach month end, using {days_fcst}")
-
-        if cet_type=='max':
-            cet_daily[:, i] = max_temperature_2m
-        elif cet_type=='min':
-            cet_daily[:, i] = min_temperature_2m
-        else:
-            cet_daily[:,i] = (max_temperature_2m + min_temperature_2m) / 2
+        self.day_of_start = self.start_date.day-1
     
-    # computing mean across the three sites for each day
-    cet = np.mean(cet_daily, axis=1)
-    cet = cet[~np.isnan(cet)]
+    def fetch_data(self, model, runtime):
 
-    print(f"Using start date {runtime} for model {model}")
-    print(f"CET mean for fcst from {model}: {np.mean(cet)}")
+        self.compute_dates(runtime)
+        
+        # empty arrays to store the CET data
+        self.cet_daily = np.empty((self.num_days_to_endmonth, 3))
+        self.cet = np.empty(self.num_days_to_endmonth)
 
-    return cet, days_fcst, runtime, start_date.day-1
+        for i, site in enumerate(sites):
+        
+            print(f"Fetching data for site: {site} from {self.start_date} to {self.end_date} ({self.num_days_to_endmonth})")
+
+            # API call to open-meteo to fetch NWP data
+
+            params = {
+                "latitude": sites[site]["latitude"],
+                "longitude": sites[site]["longitude"],
+                "daily": ["temperature_2m_max", "temperature_2m_min"],
+                "models": model,
+                "forecast_days": self.num_days_to_endmonth,
+                "run": self.runtime
+            }
+            
+            responses = openmeteo.weather_api(url, params=params)
+            response = responses[0]
+
+            max_temperature_2m = response.Daily().Variables(0).ValuesAsNumpy()
+            min_temperature_2m = response.Daily().Variables(1).ValuesAsNumpy()
+
+            # checking how many days we actually got NWP data for (not all models
+            # have same leadtime). If not reaching end of month, adjust to fcst_days
+            self.days_fcst = len(max_temperature_2m[~np.isnan(max_temperature_2m)])
+            if self.days_fcst < self.num_days_to_endmonth:
+                print(f"WARNING: Can't reach month end, using {self.days_fcst}")
+
+            if self.cet_type=='max':
+                self.cet_daily[:, i] = max_temperature_2m
+            elif self.cet_type=='min':
+                self.cet_daily[:, i] = min_temperature_2m
+            else:
+                self.cet_daily[:,i] = (max_temperature_2m + min_temperature_2m) / 2
+        
+        # computing mean across the three sites for each day
+        self.cet = np.mean(self.cet_daily, axis=1)
+        self.cet = self.cet[~np.isnan(self.cet)]
+
+        print(f"Using start date {self.runtime} for model {model}")
+        print(f"CET mean for fcst from {model}: {np.mean(self.cet)}")
+
+        return self

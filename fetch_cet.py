@@ -3,8 +3,10 @@ import urllib.request
 import pandas as pd
 import numpy as np
 from months import days_in_month
+from datetime import date, timedelta
 
 src_str = "https://www.metoffice.gov.uk/hadobs/hadcet/data/"
+
 
 def api_call(cet_str, out_path):
 
@@ -26,4 +28,8 @@ def fetch_cet(month, cet_type, filter=True):
     vals = df.iloc[:, days_in_month[month]['num']].to_numpy()[1:]  
     vals = vals[vals != -99.9]
     num_days = len(vals)
-    return vals, num_days
+    cet_in_flag = False
+    if num_days == (date.today() - timedelta(days=1)).day:
+        cet_in_flag = True
+    print(f"CET data in today: {cet_in_flag}")
+    return vals, num_days, cet_in_flag

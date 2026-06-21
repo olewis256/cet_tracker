@@ -1,0 +1,9 @@
+pandas>=2.0
+numpy>=1.25
+requests>=2.31
+matplotlib>=3.7
+flask>=2.3
+beautifulsoup4>=4.12
+openmeteo_requests>=0.1
+openmeteo-sdk>=0.1
+python-dateutil>=2.8

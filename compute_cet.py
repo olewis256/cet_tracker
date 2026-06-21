@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from datetime import date, timedelta
 import calendar
 
-
 sites = {
     "stonyhurst": {"latitude": 53.85, "longitude": -1.53},
     "rothamsted": {"latitude": 51.81, "longitude": -0.36},
@@ -15,15 +14,20 @@ sites = {
 openmeteo = openmeteo_requests.Client()
 url = "https://api.open-meteo.com/v1/forecast"
 
-start_date = date.today() - timedelta(days=1)
-last_day = calendar.monthrange(start_date.year, start_date.month)[1]
-end_date = date(start_date.year, start_date.month, last_day)
+def compute_cet(model, cet_type, cet_in_flag):
 
-num_days_to_endmonth = (end_date - start_date).days + 1
-cet_daily = np.zeros((num_days_to_endmonth, 3))
-cet = np.array(num_days_to_endmonth)
+    if cet_in_flag:
+        start_date = date.today()
+    else:
+        # if yesterday's CET isn't in yet, use yesterday's forecast
+        start_date = date.today() - timedelta(days=1)
+    last_day = calendar.monthrange(start_date.year, start_date.month)[1]
+    end_date = date(start_date.year, start_date.month, last_day)
 
-def compute_cet(model, cet_type):
+    num_days_to_endmonth = (end_date - start_date).days + 1
+    cet_daily = np.zeros((num_days_to_endmonth, 3))
+    cet = np.array(num_days_to_endmonth)
+
     for i, site in enumerate(sites):
         
         print(f"Fetching data for site: {site} from {start_date} to {end_date} ({num_days_to_endmonth})")

@@ -2,7 +2,7 @@ import numpy as np
 from openmeteo_sdk.Variable import Variable
 import openmeteo_requests
 import matplotlib.pyplot as plt
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 import calendar
 
 # sites used in the CET caclulation
@@ -13,9 +13,9 @@ sites = {
 }
 
 openmeteo = openmeteo_requests.Client()
-url = "https://api.open-meteo.com/v1/forecast"
+url = "https://single-runs-api.open-meteo.com/v1/forecast"
 
-def compute_cet(model, cet_type, cet_in_flag):
+def compute_cet(model, cet_type, cet_in_flag, runtime, use_prev, full_run):
     """
     Computing the CET from NWP fcst data
     
@@ -24,11 +24,36 @@ def compute_cet(model, cet_type, cet_in_flag):
     cet_in_flag: flag to check if yesterday's CET data has arrived
     """ 
 
+    # if yesertday's CET is in, use today's date
     if cet_in_flag:
         start_date = date.today()
+        # 06 and 18z runs aren't full runs, so use previous 00z or 12z runs
+        if full_run:
+            if runtime.endswith(("06:00")):
+                print(f"Changing run {runtime} to 00:00")
+                runtime = datetime.strptime(runtime, "%Y-%m-%dT%H:%M").replace(hour=0, minute=0, 
+                                                                        tzinfo=timezone.utc)
+                runtime = runtime.strftime("%Y-%m-%dT%H:%M")
+            elif runtime.endswith(("18:00")):
+                print(f"Changing run {runtime} to 12:00")
+                runtime = datetime.strptime(runtime, "%Y-%m-%dT%H:%M").replace(hour=12, minute=0, 
+                                                                        tzinfo=timezone.utc)
+                runtime = runtime.strftime("%Y-%m-%dT%H:%M")
+
     else:
         # if yesterday's CET isn't in yet, use yesterday's forecast
         start_date = date.today() - timedelta(days=1)
+        runtime = datetime.strptime(runtime, "%Y-%m-%dT%H:%M").replace(hour=12, minute=0, 
+                                                                       tzinfo=timezone.utc) - timedelta(days=1)
+        runtime = runtime.strftime("%Y-%m-%dT%H:%M")
+        print(f"CET not populated, using start date {runtime}")
+
+    if use_prev:
+        # use previous days 12z model runs
+        start_date = date.today() - timedelta(days=use_prev)
+        runtime = datetime.strptime(runtime, "%Y-%m-%dT%H:%M").replace(hour=12, minute=0,
+                                                                       tzinfo=timezone.utc) - timedelta(days=use_prev)
+        runtime = runtime.strftime("%Y-%m-%dT%H:%M")
 
     last_day = calendar.monthrange(start_date.year, start_date.month)[1]
     end_date = date(start_date.year, start_date.month, last_day)
@@ -36,23 +61,24 @@ def compute_cet(model, cet_type, cet_in_flag):
     # determinging how many days there are until the end of the month,
     # then creating empty arrays to hold data
     num_days_to_endmonth = (end_date - start_date).days + 1
-    cet_daily = np.zeros((num_days_to_endmonth, 3))
-    cet = np.array(num_days_to_endmonth)
+    cet_daily = np.empty((num_days_to_endmonth, 3))
+    cet = np.empty(num_days_to_endmonth)
 
     for i, site in enumerate(sites):
         
         print(f"Fetching data for site: {site} from {start_date} to {end_date} ({num_days_to_endmonth})")
 
         # API call to open-meteo to fetch NWP data
+
         params = {
             "latitude": sites[site]["latitude"],
             "longitude": sites[site]["longitude"],
             "daily": ["temperature_2m_max", "temperature_2m_min"],
             "models": model,
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat()
+            "forecast_days": num_days_to_endmonth,
+            "run": runtime
         }
-
+        
         responses = openmeteo.weather_api(url, params=params)
         response = responses[0]
 
@@ -76,6 +102,7 @@ def compute_cet(model, cet_type, cet_in_flag):
     cet = np.mean(cet_daily, axis=1)
     cet = cet[~np.isnan(cet)]
 
-    print(f"CET mean for fcst: {np.mean(cet)}")
+    print(f"Using start date {runtime} for model {model}")
+    print(f"CET mean for fcst from {model}: {np.mean(cet)}")
 
-    return cet, days_fcst
+    return cet, days_fcst, runtime, start_date.day-1

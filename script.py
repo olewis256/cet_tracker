@@ -1,12 +1,13 @@
 from fetch_cet import fetch_cet
 from compute_cet import compute_cet
+from get_fcst_runtime import get_fcst_time
 import numpy as np
 from months import days_in_month
 import matplotlib.pyplot as plt
 import smplotlib
 
 
-def cet_all(month, models, cet_type, plot=False):
+def cet_all(month, models, cet_type, plot=False, use_prev=0, full_run=False):
     """
     Final proccessing and plotting function
     
@@ -21,39 +22,55 @@ def cet_all(month, models, cet_type, plot=False):
         ValueError("Please use one model")
 
     if plot:
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(12, 8))
 
     # group would be EC, and model_array is the subset of models available from EC
     for group, model_array in models.items():
         
         for model in model_array:
 
+            runtime=get_fcst_time(model)
+
             # fetching this month's CET, and whether we have yesterday's data
             acc_cet = fetch_cet(month, cet_type)
             cet_in_flag = acc_cet[2]
 
             # fetchig and computing fcst CET, to month end (if available)
-            fcst_cet = compute_cet(model, cet_type, cet_in_flag)
+            fcst_cet = compute_cet(model, cet_type, cet_in_flag, runtime, use_prev, full_run)
+            used_time = fcst_cet[2]
             print(f"Fetched CET for month {month}. {acc_cet[0]} for {acc_cet[1]} days.")
             print(f"Computed mean CET: {fcst_cet[0]}")
 
             # How many days in total do we (may not be number of days in the month)
-            total_days = acc_cet[1] + fcst_cet[1]
-            print(f"Total days: {total_days}")
+            total_days = acc_cet[1] + (fcst_cet[1] - acc_cet[1]) + fcst_cet[3]
+            print(f"Total days of data: {total_days}")
+            assert total_days <= days_in_month[month]['days'], (
+                f"total_days={total_days} exceeds days in month "
+                f"({days_in_month[month]['days']})"
+            )
+
+            acc_cet_vals = acc_cet[0]
+
+            if use_prev and cet_in_flag:
+                fcst_cet_vals = fcst_cet[0][use_prev:]
+                fcst_start = len(acc_cet[0]) + 1 - use_prev
+            else:
+                fcst_cet_vals = fcst_cet[0]
+                fcst_start = len(acc_cet[0])+1
 
             # final CET computation, using current CET and fcst CET
-            cet_vals = np.sum(acc_cet[0]) + np.sum(fcst_cet[0])
+            cet_vals = np.sum(acc_cet_vals) + np.sum(fcst_cet_vals)
             cet_vals = cet_vals / total_days
 
-            print(f"Computed total CET: {cet_vals}.")
+            print(f"Computed total CET {model}: {cet_vals}.")
 
             # constructing date arrays for plot
             dates_cet = np.linspace(1, len(acc_cet[0]), len(acc_cet[0]), endpoint=True)
-            dates_fcst = np.linspace(len(acc_cet[0])+1, total_days, total_days-len(acc_cet[0]), endpoint=True)
+            dates_fcst = np.linspace(fcst_start, fcst_start + len(fcst_cet[0]), len(fcst_cet[0]), endpoint=True)
                 
             if plot:
         
-                ax.plot(dates_fcst, fcst_cet[0], label=f"{model}, cet: {cet_vals:.1f} C")
+                ax.plot(dates_fcst, fcst_cet[0], label=f"{model}, cet: {cet_vals:.1f} C to {total_days} ({used_time})")
                 ax.plot(dates_cet, acc_cet[0], color='black', linestyle='--')
 
 
@@ -71,14 +88,16 @@ def cet_all(month, models, cet_type, plot=False):
 if __name__=="__main__":
 
     CET_TYPE = 'mean'
+
     MONTH = 'June'
     MODELS = {'EC': ["ecmwf_ifs", "ecmwf_ifs025", "ecmwf_aifs025_single"]}
-    # MODELS = {'GFS': ["gfs_global"]}
+    # MODELS = {'GFS': ["gfs_global", "ncep_aigfs025"]}
+    # MODELS = {'MO': ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]}
     # MODELS = {'ICON': ["icon_global"]}
 
     # MODELS = ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]
 
-    cet_all(MONTH, MODELS, CET_TYPE, plot=True)
+    cet_all(MONTH, MODELS, CET_TYPE, plot=True, full_run=True)
 
     """
     TO DO: I would like to compute next month fcst CET too, but will need to separable out. Perhaps flag for either this month/next month

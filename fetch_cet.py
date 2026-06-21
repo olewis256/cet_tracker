@@ -15,9 +15,9 @@ def api_call(cet_str, out_path):
     out_path: where to output the downloaded file
     """
 
-    url_string = os.path.join(src_str, cet_str)
+    url_str = os.path.join(src_str, cet_str)
     
-    with urllib.request.urlopen(url_string) as response, open(out_path, "wb") as f:
+    with urllib.request.urlopen(url_str) as response, open(out_path, "wb") as f:
         data = response.read()  
         f.write(data)
 

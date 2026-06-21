@@ -4,4 +4,6 @@ The driver script is script.py, where models and CET type (maximum, minimum, mea
 
 Usage:
 
+Install required packages with "pip install -r requirements.txt" in your terminal
+
 Configure underneath __name__=="__main__", then run "python script.py" in your terminal.

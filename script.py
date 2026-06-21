@@ -7,6 +7,16 @@ import matplotlib.pyplot as plt
 import smplotlib
 
 class ProcessCET():
+    """
+    Main script for processing both observed and forecast CET data.
+
+    fetch_cet_data: Collects observed CET data, with flag to whether yesterday's CET data has
+                    arrived yet.
+    nwp_cet_data:   Collects and processes the forecasted CET data, while also splitting up
+                    the dates to ensure the predicted CET is a blend of observed and forecasted
+                    values (sometimes messy when using previous runs and there is significant
+                    overlap). Optional tools for plotting.
+    """
 
     def __init__(self, month, models, cet_type, plot=False, use_prev=0, full_run=False):
 
@@ -74,6 +84,8 @@ class ProcessCET():
                         nwp_cet_filter = self.nwp_cet.cet[self.use_prev:]
                         self.fcst_start = self.cet_days + 1 - self.use_prev
                     else:
+                        # if no NWP data is ahead of CET data, we don't 
+                        # use it in final prediction
                         nwp_cet_filter = 0
                         self.fcst_start = self.cet_days + 1 - self.use_prev
                 else:
@@ -109,13 +121,22 @@ class ProcessCET():
         
 
 if __name__=="__main__":
+    """
+    Script to run to create predicted CETs:
+
+    CET_TYPE: 'max', 'min', 'mean'
+    MODELS: (TO DO, create separate class)
+    plot: boolean, plot or not
+    use_prev: how many days ago to use run (default 0 days)
+    full_run: now defunct, was using with issues with smaller lead time 06/18z runs
+    """
 
     CET_TYPE = 'mean'
 
     MONTH = 'June'
-    MODELS = {'EC': ["ecmwf_ifs", "ecmwf_ifs025", "ecmwf_aifs025_single"]}
+    # MODELS = {'EC': ["ecmwf_ifs", "ecmwf_ifs025", "ecmwf_aifs025_single"]}
     # MODELS = {'GFS': ["gfs_global", "ncep_aigfs025"]}
-    # MODELS = {'MO': ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]}
+    MODELS = {'MO': ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]}
     # MODELS = {'ICON': ["icon_global"]}
 
     # MODELS = ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]

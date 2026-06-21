@@ -15,6 +15,14 @@ openmeteo = openmeteo_requests.Client()
 url = "https://single-runs-api.open-meteo.com/v1/forecast"
 
 class ComputeCET():
+    """
+    Main computing script for the NWP data.
+
+    compute_dates: This determines how to set up date and runtimes for fetching NWP data. If cet_in_flag is false,
+                   we use yesterday's NWP data to fill the gap. Also options to use previous specified runs.
+    fetch_data:    Call to open-meteo API to extract NWP data for the three CET sites, compute means across them by
+                   day to get daily CET data. Also specifies how far ahead of the latest CET data our forecast goes.
+    """
 
     def __init__(self, cet_type, cet_in_flag, use_prev, full_run):
 

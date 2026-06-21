@@ -9,8 +9,13 @@ src_str = "https://www.metoffice.gov.uk/hadobs/hadcet/data/"
 
 
 class cetDATA:
+    """
+    Fetches CET data from the Met Office HadCET website, reading it into a dataframe
+    and setting the attributes. Also has a boolean flag cet_in_flag that says whether
+    yesterday's CET data has arrived yet
+    """
 
-    cet_vals: pd.DataFrame
+    cet_vals: np.ndarray
     cet_days: int
     cet_in_flag: bool
 

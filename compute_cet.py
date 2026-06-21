@@ -57,5 +57,3 @@ def compute_cet(model, cet_type):
     cet = cet[~np.isnan(cet)]
 
     return cet, days_fcst
-
-# print(f"Mean CET for all sites: {compute_cet()[0]} for {compute_cet()[1]} days.")

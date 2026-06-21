@@ -2,13 +2,8 @@ from fetch_cet import fetch_cet
 from compute_cet import compute_cet
 import numpy as np
 from months import days_in_month
-
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from datetime import date
-
 import smplotlib
-
 
 
 def cet_all(month, models, cet_type, plot=False):
@@ -30,30 +25,22 @@ def cet_all(month, models, cet_type, plot=False):
 
         print(f"Computed total CET: {cet_vals}.")
 
+        dates_cet = np.linspace(1, len(acc_cet[0]), len(acc_cet[0]), endpoint=True)
+        dates_fcst = np.linspace(len(acc_cet[0])+1, total_days, total_days-len(acc_cet[0]), endpoint=True)
+            
         if plot:
     
-            dates_cet = np.linspace(1, len(acc_cet[0]), len(acc_cet[0]), endpoint=True)
-            dates_fcst = np.linspace(len(acc_cet[0])+1, total_days, total_days-len(acc_cet[0]), endpoint=True)
-            
             ax.plot(dates_fcst, fcst_cet[0], label=f"{model}, cet: {cet_vals:.1f} C")
             ax.plot(dates_cet, acc_cet[0], color='black', linestyle='--')
-        
 
-    if cet_type=='max':
-        ax.set_title(f"June 2026 maximum daily CET")
-        ax.set_ylabel("Daily maximum CET (C)")
-        save_str = f'plots/test_max_{model}.png'
-    elif cet_type=='min':
-        ax.set_title(f"June 2026 minimum daily CET")
-        ax.set_ylabel("Daily minimum CET (C)")
-        save_str = f'plots/test_min_{model}.png'
-    else:
-        ax.set_title(f"June 2026 daily CET")
-        ax.set_ylabel("Daily CET (C)")
-        save_str = f'plots/test_mean_{model}.png'
+
+    ax.set_title(f"June 2026 {cet_type} daily CET")
+    ax.set_ylabel(f"Daily {cet_type} CET (C)")
+    save_str = f'plots/test_{model}_{cet_type}.png'
+
     ax.set_xlabel("Day")
-    ax.set_xlim(1, days_in_month[month])
-    ax.set_xticks([1, 5, 10, 15, 20, 25, days_in_month[month]])
+    ax.set_xlim(1, days_in_month[month]['days'])
+    ax.set_xticks([1, 5, 10, 15, 20, 25, days_in_month[month]['days']])
     ax.legend()
     plt.savefig(save_str)
 

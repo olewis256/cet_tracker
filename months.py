@@ -1,3 +1,3 @@
 days_in_month = {
-    'June': 30
+    'June': {'days': 30, 'num': 6},
 }

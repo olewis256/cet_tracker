@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from datetime import date, timedelta
 import calendar
 
+# sites used in the CET caclulation
 sites = {
     "stonyhurst": {"latitude": 53.85, "longitude": -1.53},
     "rothamsted": {"latitude": 51.81, "longitude": -0.36},
@@ -15,15 +16,25 @@ openmeteo = openmeteo_requests.Client()
 url = "https://api.open-meteo.com/v1/forecast"
 
 def compute_cet(model, cet_type, cet_in_flag):
+    """
+    Docstring for compute_cet
+    
+    model: NWP model to use
+    cet_type: what type of CET are we computing
+    cet_in_flag: flag to check if yesterday's CET data has arrived
+    """ 
 
     if cet_in_flag:
         start_date = date.today()
     else:
         # if yesterday's CET isn't in yet, use yesterday's forecast
         start_date = date.today() - timedelta(days=1)
+
     last_day = calendar.monthrange(start_date.year, start_date.month)[1]
     end_date = date(start_date.year, start_date.month, last_day)
 
+    # determinging how many days there are until the end of the month,
+    # then creating empty arrays to hold data
     num_days_to_endmonth = (end_date - start_date).days + 1
     cet_daily = np.zeros((num_days_to_endmonth, 3))
     cet = np.array(num_days_to_endmonth)
@@ -31,6 +42,8 @@ def compute_cet(model, cet_type, cet_in_flag):
     for i, site in enumerate(sites):
         
         print(f"Fetching data for site: {site} from {start_date} to {end_date} ({num_days_to_endmonth})")
+
+        # API call to open-meteo to fetch NWP data
         params = {
             "latitude": sites[site]["latitude"],
             "longitude": sites[site]["longitude"],
@@ -39,13 +52,15 @@ def compute_cet(model, cet_type, cet_in_flag):
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat()
         }
-        responses = openmeteo.weather_api(url, params=params)
 
+        responses = openmeteo.weather_api(url, params=params)
         response = responses[0]
 
         max_temperature_2m = response.Daily().Variables(0).ValuesAsNumpy()
         min_temperature_2m = response.Daily().Variables(1).ValuesAsNumpy()
 
+        # checking how many days we actually got NWP data for (not all models
+        # have same leadtime). If not reaching end of month, adjust to fcst_days
         days_fcst = len(max_temperature_2m[~np.isnan(max_temperature_2m)])
         if days_fcst < num_days_to_endmonth:
             print(f"WARNING: Can't reach month end, using {days_fcst}")
@@ -56,8 +71,11 @@ def compute_cet(model, cet_type, cet_in_flag):
             cet_daily[:, i] = min_temperature_2m
         else:
             cet_daily[:,i] = (max_temperature_2m + min_temperature_2m) / 2
-         
+    
+    # computing mean across the three sites for each day
     cet = np.mean(cet_daily, axis=1)
     cet = cet[~np.isnan(cet)]
+
+    print(f"CET mean for fcst: {np.mean(cet)}")
 
     return cet, days_fcst

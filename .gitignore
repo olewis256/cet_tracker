@@ -1,6 +1,5 @@
 __pycache__/
 *.pyc
 tmp/
-plots/*.png
 ssh/
 .DS_Store

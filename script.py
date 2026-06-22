@@ -52,7 +52,6 @@ class ProcessCET():
         
             for model in model_array:
 
-                self.fetch_cet_data()
                 runtime=get_fcst_time(model)
                 
                 self.nwp_cet.fetch_data(model, runtime)
@@ -134,9 +133,9 @@ if __name__=="__main__":
     CET_TYPE = 'mean'
 
     MONTH = 'June'
-    # MODELS = {'EC': ["ecmwf_ifs", "ecmwf_ifs025", "ecmwf_aifs025_single"]}
+    MODELS = {'EC': ["ecmwf_ifs", "ecmwf_ifs025", "ecmwf_aifs025_single"]}
     # MODELS = {'GFS': ["gfs_global", "ncep_aigfs025"]}
-    MODELS = {'MO': ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]}
+    # MODELS = {'MO': ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]}
     # MODELS = {'ICON': ["icon_global"]}
 
     # MODELS = ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]

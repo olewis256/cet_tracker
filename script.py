@@ -127,14 +127,11 @@ class ProcessCET():
                     cet_vals = np.sum(self.cet_vals) + np.sum(nwp_cet_filter)
                 cet_vals = cet_vals / tot_days
 
+                print(f"Current rolling CET: {np.sum(self.cet_vals)/self.cet_days}")
                 print(f"Computed total CET {model}: {cet_vals}.")
 
                 
                 if self.plot:
-                    
-                    if not self.next_month:
-                        dates_cet = np.linspace(1, self.cet_days, self.cet_days, endpoint=True)
-                        self.ax.plot(dates_cet, self.cet_vals, color='black', linestyle='--')
 
                     dates_fcst = np.linspace(self.fcst_start, self.fcst_start + self.nwp_cet.days_fcst - 1, self.nwp_cet.days_fcst, endpoint=True)
                     print(dates_fcst)
@@ -147,6 +144,9 @@ class ProcessCET():
             self.ax.set_title(f"{self.month} 2026 {self.cet_type} daily CET")
             self.ax.set_ylabel(f"Daily {self.cet_type} CET (C)")
             save_str += ".png"
+
+            dates_cet = np.linspace(1, self.cet_days, self.cet_days, endpoint=True)
+            self.ax.plot(dates_cet, self.cet_vals, color='black', linestyle='--', label=f'rolling cet: {np.sum(self.cet_vals)/self.cet_days:.1f} C')
 
             self.ax.set_xlabel("Day")
             self.ax.set_xlim(1, days_in_month[self.month]['days'])
@@ -169,7 +169,7 @@ if __name__=="__main__":
 
     CET_TYPE = 'mean'
 
-    MONTH = 'July'
+    MONTH = 'June'
     MODELS = {'EC': ["ecmwf_ifs", "ecmwf_ifs025", "ecmwf_aifs025_single"]}
     # MODELS = {'GFS': ["gfs_global", "ncep_aigfs025"]}
     # MODELS = {'MO': ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]}
@@ -177,8 +177,8 @@ if __name__=="__main__":
 
     # MODELS = ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]
 
-    # process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, plot=True, use_prev=0, full_run=True)
-    process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, next_month=True, plot=True)
+    process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, plot=True, use_prev=0, full_run=True)
+    # process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, next_month=True, plot=True)
     process_cet.nwp_cet_data()
     """
     TO DO: I would like to compute next month fcst CET too, but will need to separable out. Perhaps flag for either this month/next month

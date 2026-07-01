@@ -155,7 +155,7 @@ class ProcessCET():
 
             self.ax.set_title(f"{self.month} 2026 {self.cet_type} daily CET")
             self.ax.set_ylabel(f"Daily {self.cet_type} CET (C)")
-            save_str += "_15step.png"
+            save_str += f"_{self.use_prev}step.png"
 
             if not self.next_month:
                 dates_cet = np.linspace(1, self.cet_days, self.cet_days, endpoint=True)
@@ -190,7 +190,7 @@ if __name__=="__main__":
 
     # MODELS = ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]
 
-    process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, plot=True, use_prev=15, full_run=True)
+    process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, plot=True, use_prev=8, full_run=True)
     # process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, next_month=True, plot=True)
     process_cet.nwp_cet_data()
     """

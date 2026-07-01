@@ -34,6 +34,7 @@ class ProcessCET():
         self.use_prev = use_prev
         self.full_run = full_run
         self.next_month = next_month
+        self.fcst_start = 0
 
         self.plot = plot
         if self.plot:
@@ -108,11 +109,19 @@ class ProcessCET():
                     if days_ahead_of_cet > 0:
                         nwp_cet_filter = self.nwp_cet.cet[self.use_prev:]
                         self.fcst_start = self.cet_days + 1 - self.use_prev
-                    else:
+                    elif days_ahead_of_cet < 0 and not self.use_prev:
                         # if no NWP data is ahead of CET data, we don't 
                         # use it in final prediction
                         nwp_cet_filter = 0
                         self.fcst_start = self.cet_days + 1 - self.use_prev
+                    elif days_ahead_of_cet <= 0 and self.use_prev:
+                        cet_filter = self.cet_vals[0:self.nwp_cet.day_of_start]
+                        print("CET filter: ", cet_filter)
+                        tot_days = len(cet_filter) + self.nwp_cet.days_fcst
+                        nwp_cet_filter = self.nwp_cet.cet
+                        print("NWP CET filter: ", nwp_cet_filter)
+                        self.fcst_start = self.nwp_cet.day_of_start+1
+                        print("total days: ", tot_days)
                 elif self.next_month:
                     nwp_cet_filter = self.nwp_cet.cet
                     self.fcst_start = self.nwp_cet.day_of_start+1
@@ -122,20 +131,23 @@ class ProcessCET():
 
                 # final CET computation, using current CET and fcst CET
                 if self.next_month:
-                    cet_vals = np.sum(nwp_cet_filter)
+                    cet_vals_all = np.sum(nwp_cet_filter)
+                elif self.use_prev and days_ahead_of_cet <= 0:
+                    cet_vals_all = np.sum(cet_filter) + np.sum(nwp_cet_filter)
                 else:
-                    cet_vals = np.sum(self.cet_vals) + np.sum(nwp_cet_filter)
-                cet_vals = cet_vals / tot_days
+                    print(f"Current rolling CET: {np.sum(self.cet_vals)/self.cet_days}")
+                    cet_vals_all = np.sum(self.cet_vals) + np.sum(nwp_cet_filter)
+                cet_vals_all = cet_vals_all / tot_days
 
-                print(f"Current rolling CET: {np.sum(self.cet_vals)/self.cet_days}")
-                print(f"Computed total CET {model}: {cet_vals}.")
+                
+                print(f"Computed total CET {model}: {cet_vals_all}.")
 
                 
                 if self.plot:
 
                     dates_fcst = np.linspace(self.fcst_start, self.fcst_start + self.nwp_cet.days_fcst - 1, self.nwp_cet.days_fcst, endpoint=True)
                     print(dates_fcst)
-                    self.ax.plot(dates_fcst, self.nwp_cet.cet, label=f"{model}, cet: {cet_vals:.1f} C to {tot_days} ({model_runtime})")
+                    self.ax.plot(dates_fcst, self.nwp_cet.cet, label=f"{model}, cet: {cet_vals_all:.1f} C to {tot_days} ({model_runtime})")
                     
             save_str += f"_{group}"
 
@@ -143,10 +155,11 @@ class ProcessCET():
 
             self.ax.set_title(f"{self.month} 2026 {self.cet_type} daily CET")
             self.ax.set_ylabel(f"Daily {self.cet_type} CET (C)")
-            save_str += ".png"
+            save_str += "_15step.png"
 
-            dates_cet = np.linspace(1, self.cet_days, self.cet_days, endpoint=True)
-            self.ax.plot(dates_cet, self.cet_vals, color='black', linestyle='--', label=f'rolling cet: {np.sum(self.cet_vals)/self.cet_days:.1f} C')
+            if not self.next_month:
+                dates_cet = np.linspace(1, self.cet_days, self.cet_days, endpoint=True)
+                self.ax.plot(dates_cet, self.cet_vals, color='black', linestyle='--', label=f'rolling cet: {np.sum(self.cet_vals)/self.cet_days:.1f} C')
 
             self.ax.set_xlabel("Day")
             self.ax.set_xlim(1, days_in_month[self.month]['days'])
@@ -170,14 +183,14 @@ if __name__=="__main__":
     CET_TYPE = 'mean'
 
     MONTH = 'June'
-    MODELS = {'EC': ["ecmwf_ifs", "ecmwf_ifs025", "ecmwf_aifs025_single"]}
+    MODELS = {'EC': ["ecmwf_aifs025_single"]}
     # MODELS = {'GFS': ["gfs_global", "ncep_aigfs025"]}
     # MODELS = {'MO': ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]}
     # MODELS = {'ICON': ["icon_global"]}
 
     # MODELS = ["ukmo_global_deterministic_10km", "ukmo_uk_deterministic_2km"]
 
-    process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, plot=True, use_prev=0, full_run=True)
+    process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, plot=True, use_prev=15, full_run=True)
     # process_cet = ProcessCET(MONTH, MODELS, CET_TYPE, next_month=True, plot=True)
     process_cet.nwp_cet_data()
     """
